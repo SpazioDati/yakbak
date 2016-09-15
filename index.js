@@ -18,11 +18,17 @@ var debug = require('debug')('yakbak:server');
  * @param {Object} opts
  * @param {String} opts.dirname The tapes directory
  * @param {Boolean} opts.noRecord if true, requests will return a 404 error if the tape doesn't exist
+ * @param {Boolean} opts.verbose if true, tapes comments will contain request and response body (might get large!)
  * @returns {Function}
  */
 
 module.exports = function (host, opts) {
   assert(opts.dirname, 'You must provide opts.dirname');
+
+  opts.verbose = typeof(opts.verbose) !== 'undefined';
+  if (opts.verbose) {
+      debug('Verbose mode active');
+  }
 
   return function (req, res) {
     mkdirp.sync(opts.dirname);
@@ -37,10 +43,14 @@ module.exports = function (host, opts) {
       }).catch(ModuleNotFoundError, function (/* err */) {
 
         if (opts.noRecord) {
+          /* eslint-disable no-console */
+          console.log('An HTTP request has been made that yakbak does not know how to handle');
+          console.log(curl.request(req, body));
+          /* eslint-enable no-console */
           throw new RecordingDisabledError('Recording Disabled');
         } else {
           return proxy(req, body, host).then(function (pres) {
-            return record(pres.req, pres, file);
+            return record(pres.req, body, pres, file, opts.verbose);
           });
         }
 
@@ -50,10 +60,6 @@ module.exports = function (host, opts) {
     }).then(function (tape) {
       return tape(req, res);
     }).catch(RecordingDisabledError, function (err) {
-      /* eslint-disable no-console */
-      console.log('An HTTP request has been made that yakbak does not know how to handle');
-      console.log(curl.request(req));
-      /* eslint-enable no-console */
       res.statusCode = err.status;
       res.end(err.message);
     });

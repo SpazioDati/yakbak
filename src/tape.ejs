@@ -8,6 +8,23 @@ var path = require("path");
 <% }); -%>
  */
 
+<% if (is_verbose === true) { %>
+
+/* Request body:
+<% req_body.forEach(function (data) { -%>
+<%- decodeURIComponent(data.toString()) %>
+<% }); -%>
+*/
+
+/* Response body:
+<% body.forEach(function (data) { -%>
+<%- data.toString() %>
+<% }); -%>
+*/
+
+<% } %>
+
+
 module.exports = function (req, res) {
   res.statusCode = <%- JSON.stringify(res.statusCode) %>;
 
