@@ -33,10 +33,10 @@ module.exports = function (host, opts) {
   return function (req, res) {
     mkdirp.sync(opts.dirname);
 
-    debug('req', req.url);
-
     return buffer(req).then(function (body) {
       var file = path.join(opts.dirname, tapename(req, body));
+
+      debug('req', req.url, file);
 
       return Promise.try(function () {
         return require.resolve(file);
