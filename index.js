@@ -25,7 +25,6 @@ var debug = require('debug')('yakbak:server');
 module.exports = function (host, opts) {
   assert(opts.dirname, 'You must provide opts.dirname');
 
-  opts.verbose = typeof(opts.verbose) !== 'undefined';
   if (opts.verbose) {
       debug('Verbose mode active');
   }
