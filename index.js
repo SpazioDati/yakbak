@@ -11,6 +11,8 @@ var proxy = require('./lib/proxy');
 var record = require('./lib/record');
 var curl = require('./lib/curl');
 var debug = require('debug')('yakbak:server');
+var fs = require('fs');
+
 
 /**
  * Returns a new yakbak proxy middleware.
@@ -29,13 +31,46 @@ module.exports = function (host, opts) {
       debug('Verbose mode active');
   }
 
+  var defaultNamespace = '',
+      currentNamespace = defaultNamespace,
+      namespaceStats = {'': {errors: [], used: [], orphans: []}};
+
   return function (req, res) {
     mkdirp.sync(opts.dirname);
 
     return buffer(req).then(function (body) {
-      var file = path.join(opts.dirname, tapename(req, body));
 
-      debug('req', req.url, file);
+      var parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+      if (parsedUrl.pathname === '/yakbak/set-namespace/') {
+        if (parsedUrl.searchParams.get('namespace') == null) {
+          debug('Trying to set namespace with no namespace parameter', parsedUrl.searchParams);
+          throw new NamespaceMethodError('No namespace given. Pass `?namespace=something` to set one.');
+        }
+
+        currentNamespace = parsedUrl.searchParams.get('namespace');
+        namespaceStats[currentNamespace] = {errors: [], used: [], orphans: []};
+        debug(`Set namespace to: ${currentNamespace}`);
+        throw new NamespaceMethodSuccess(`Namespace set to: ${currentNamespace}`);
+
+      } else if (parsedUrl.pathname === '/yakbak/reset-namespace/') {
+        debug(`Reset namespace to default`);
+        var previousNamespace = currentNamespace;
+        currentNamespace = defaultNamespace;
+
+        var dirName = path.join(opts.dirname, previousNamespace);
+        if (fs.existsSync(dirName)) {
+          fs.readdirSync(dirName).forEach(file => {
+            if (!namespaceStats[previousNamespace].used.includes(file)) {
+              namespaceStats[previousNamespace].orphans.push(file);
+            }
+          });
+        }
+
+        throw new NamespaceMethodSuccess(JSON.stringify(namespaceStats[previousNamespace]));
+      }
+
+      var file = path.join(opts.dirname, currentNamespace, tapename(req, body));
+      debug('req / file:', req.url, file);
 
       return Promise.try(function () {
         return require.resolve(file);
@@ -43,24 +78,36 @@ module.exports = function (host, opts) {
 
         if (opts.noRecord) {
           /* eslint-disable no-console */
-          console.log('An HTTP request has been made that yakbak does not know how to handle');
+          console.log(`[${host}] An HTTP request has been made that yakbak does not know how to handle: `);
+          console.log(`[${host}] namespace: ${currentNamespace}`);
+          console.log(`[${host}] requested url: ${req.url}`);
           console.log(curl.request(req, body));
+
+          namespaceStats[currentNamespace].errors.push(req.url);
+
           /* eslint-enable no-console */
           throw new RecordingDisabledError('Recording Disabled');
         } else {
           return proxy(req, body, host).then(function (pres) {
-            return record(pres.req, body, pres, file, opts.verbose);
+            return record(pres.req, body, pres, file, opts.verbose, currentNamespace);
           });
         }
 
       });
     }).then(function (file) {
+      namespaceStats[currentNamespace].used.push(path.basename(file));
       return require(file);
     }).then(function (tape) {
       return tape(req, res);
     }).catch(RecordingDisabledError, function (err) {
       res.statusCode = err.status;
       res.end(err.message);
+    }).catch(NamespaceMethodError, function (err) {
+      res.statusCode = err.status;
+      res.end(err.message);
+    }).catch(NamespaceMethodSuccess, function (msg) {
+      msg.statusCode = msg.status;
+      res.end(msg.message);
     });
 
   };
@@ -68,7 +115,7 @@ module.exports = function (host, opts) {
 };
 
 /**
- * Returns the tape name for `req`.
+ * Returns the tape name for 'req`.
  * @param {http.IncomingMessage} req
  * @param {Array.<Buffer>} body
  * @returns {String}
@@ -100,3 +147,16 @@ function RecordingDisabledError(message) {
 }
 
 RecordingDisabledError.prototype = Object.create(Error.prototype);
+
+
+function NamespaceMethodSuccess(message) {
+  this.message = message;
+  this.status = 200;
+}
+
+function NamespaceMethodError(message) {
+  this.message = message;
+  this.status = 400;
+}
+NamespaceMethodSuccess.prototype = Object.create(Error.prototype);
+NamespaceMethodError.prototype = Object.create(Error.prototype);
