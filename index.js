@@ -69,6 +69,10 @@ module.exports = function (host, opts) {
         throw new NamespaceMethodSuccess(JSON.stringify(namespaceStats[previousNamespace]));
       }
 
+      // Overwriting the host so the tapename() function will return a stable hashname ignoring the host used
+      // in the original request. It might be different between local development and ci envs.
+      req.headers['host'] = 'un-qualsiasi-host';
+
       var file = path.join(opts.dirname, currentNamespace, tapename(req, body));
       debug('req / file:', req.url, file);
 
