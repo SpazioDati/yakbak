@@ -73,6 +73,11 @@ module.exports = function (host, opts) {
       // in the original request. It might be different between local development and ci envs.
       req.headers['host'] = 'un-qualsiasi-host';
 
+	  // avoid to store the request id
+	  delete req.headers['x-dl-request-id'];
+	  // avoid to store tracing includes
+	  delete req.headers['x-amzn-trace-id'];
+
       var file = path.join(opts.dirname, currentNamespace, tapename(req, body));
       debug('req / file:', req.url, file);
 
