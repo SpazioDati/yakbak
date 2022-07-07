@@ -13,6 +13,15 @@ var curl = require('./lib/curl');
 var debug = require('debug')('yakbak:server');
 var fs = require('fs');
 
+const parseCookie = str =>
+  str
+  .split(';')
+  .map(v => v.split('='))
+  .reduce((acc, v) => {
+    acc[decodeURIComponent(v[0].trim())] = decodeURIComponent(v[1].trim());
+    return acc;
+  }, {});
+
 
 /**
  * Returns a new yakbak proxy middleware.
@@ -72,6 +81,12 @@ module.exports = function (host, opts) {
       // Overwriting the host so the tapename() function will return a stable hashname ignoring the host used
       // in the original request. It might be different between local development and ci envs.
       req.headers['host'] = 'un-qualsiasi-host';
+
+      if (req.headers.cookie?.includes('namespace=')) {
+        currentNamespace = parseCookie(req.headers.cookie).namespace
+        namespaceStats[currentNamespace] = {errors: [], used: [], orphans: []};
+        delete req.headers.cookie //= req.headers.cookie.replace(`namespace=${currentNamespace}`, '')
+      }
 
       var file = path.join(opts.dirname, currentNamespace, tapename(req, body));
       debug('req / file:', req.url, file);
