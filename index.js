@@ -40,13 +40,12 @@ module.exports = function (host, opts) {
       debug('Verbose mode active');
   }
 
-  var defaultNamespace = '',
+  return function (req, res) {
+    let defaultNamespace = '',
       currentNamespace = defaultNamespace,
       namespaceStats = {'': {errors: [], used: [], orphans: []}};
 
-  return function (req, res) {
     mkdirp.sync(opts.dirname);
-
     return buffer(req).then(function (body) {
 
       var parsedUrl = new URL(req.url, `http://${req.headers.host}`);
