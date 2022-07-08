@@ -40,10 +40,12 @@ module.exports = function (host, opts) {
       debug('Verbose mode active');
   }
 
+  let defaultNamespace = '',
+    globalCurrentNamespace = defaultNamespace,
+    namespaceStats = {'': {errors: [], used: [], orphans: []}};
+
   return function (req, res) {
-    let defaultNamespace = '',
-      currentNamespace = defaultNamespace,
-      namespaceStats = {'': {errors: [], used: [], orphans: []}};
+    let currentNamespace = globalCurrentNamespace;
 
     mkdirp.sync(opts.dirname);
     return buffer(req).then(function (body) {
@@ -58,6 +60,8 @@ module.exports = function (host, opts) {
         currentNamespace = parsedUrl.searchParams.get('namespace');
         namespaceStats[currentNamespace] = {errors: [], used: [], orphans: []};
         debug(`Set namespace to: ${currentNamespace}`);
+
+        globalCurrentNamespace = currentNamespace;
         throw new NamespaceMethodSuccess(`Namespace set to: ${currentNamespace}`);
 
       } else if (parsedUrl.pathname === '/yakbak/reset-namespace/') {
@@ -74,6 +78,7 @@ module.exports = function (host, opts) {
           });
         }
 
+        globalCurrentNamespace = currentNamespace;
         throw new NamespaceMethodSuccess(JSON.stringify(namespaceStats[previousNamespace]));
       }
 
