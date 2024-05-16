@@ -28,7 +28,7 @@ var path = require("path");
 module.exports = function (req, res) {
   res.statusCode = <%- JSON.stringify(res.statusCode) %>;
 
-<% Object.keys(res.headers).filter(function (key){ return !['traceparent','x-dl-request-id','x-sd-trace-id'].includes(key)}).forEach(function (key) { -%>
+<% Object.keys(res.headers).filter(function (key){ return !['traceparent','x-dl-request-id','x-sd-trace-id','x-dl-customdata-etag'].includes(key)}).forEach(function (key) { -%>
   res.setHeader(<%- JSON.stringify(key) %>, <%- JSON.stringify(res.headers[key]) %>);
 <% }); -%>
 
